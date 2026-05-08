@@ -30,6 +30,13 @@ MCP SQL is an intelligent database interface that leverages AI to bridge the gap
 4. **Executes** queries against PostgreSQL
 5. **Returns** results in a user-friendly format
 
+---
+### Screenshot
+
+![alt text](image.png)
+
+
+---
 ### Key Use Cases
 
 - Business analysts querying data without SQL knowledge
