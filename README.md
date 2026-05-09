@@ -160,7 +160,8 @@ mcp sql/
 4. **Start Backend**
    ```bash
    cd backend
-   npx ts-node server.ts
+   npx tsc --outDir dist   
+   node dist/server.js
    # Expected output: 🚀 Backend running on http://localhost:3001
    ```
 
