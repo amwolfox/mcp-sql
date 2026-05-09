@@ -231,6 +231,7 @@ Try these prompts in the frontend or via the API `/api/chat`:
 - "List city and state for the employee named Mia."
 - "How many employees are in Texas?"
 - "Show employees older than 30, sorted by age desc."
+- "who is the youngest employee?"
 
 Direct SQL examples (for reference):
 ```sql
