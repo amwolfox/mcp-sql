@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: mesut
+      POSTGRES_PASSWORD: mesutpass
+      POSTGRES_DB: springbootmicroservicesdemo
+    volumes:
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://mesut:mesutpass@db:5432/springbootmicroservicesdemo
+      # Use local Ollama running on the host machine
+      OLLAMA_URL: http://host.docker.internal:11434
+      PORT: 3001
+    ports:
+      - "3001:3001"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    ports:
+      - "3000:3000"

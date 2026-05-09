@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -34,6 +34,80 @@ app.use(express.json());
 const PORT = process.env.PORT || 3001;
 const DB_CONFIG = process.env.DATABASE_URL || "postgresql://mesut@localhost:5432/springbootmicroservicesdemo";
 const MODEL = process.env.LLM_MODEL || "qwen2.5-coder";
+
+// Optional Ollama HTTP endpoint (containerized Ollama)
+const OLLAMA_URL = process.env.OLLAMA_URL;
+
+async function callOllamaChat(opts: { model: string; messages: any[]; tools?: any[] }) {
+  if (OLLAMA_URL) {
+    const fetchFn = (globalThis as any).fetch;
+    const base = OLLAMA_URL.replace(/\/$/, '');
+    const endpoints = ['/api/chat', '/chat', '/v1/chat', '/v1/generate', '/api/generate'];
+
+    for (const ep of endpoints) {
+      const url = `${base}${ep}?model=${encodeURIComponent(opts.model)}`;
+      try {
+        const resp = await fetchFn(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: opts.model, messages: opts.messages, tools: opts.tools })
+        });
+
+        if (resp.status === 404) {
+          // try next endpoint
+          console.warn(`Ollama endpoint ${url} returned 404, trying next fallback`);
+          continue;
+        }
+
+        if (!resp.ok) {
+          const body = await resp.text().catch(() => '<non-text body>');
+          throw new Error(`Ollama HTTP error ${resp.status} at ${url}: ${body}`);
+        }
+
+        const contentType = resp.headers.get('content-type') || '';
+
+        if (contentType.includes('ndjson') || contentType.includes('application/x-ndjson')) {
+          // NDJSON streaming response: aggregate message.content across chunks
+          const text = await resp.text();
+          const lines = text.split(/\r?\n/).filter(Boolean);
+          const parsed: any[] = [];
+          const parts: string[] = [];
+          for (const line of lines) {
+            try {
+              const obj = JSON.parse(line);
+              parsed.push(obj);
+              const content = obj.message?.content;
+              if (typeof content === 'string') parts.push(content);
+            } catch (e) {
+              // ignore parse errors for partial lines
+            }
+          }
+
+          const aggregated = parts.join('');
+          const message = { role: 'assistant', content: aggregated };
+          console.log(`Ollama HTTP (ndjson): used endpoint ${url}`);
+          return { message, raw: parsed } as any;
+        }
+
+        const data = await resp.json();
+        const message = data.choices?.[0]?.message || data;
+        console.log(`Ollama HTTP: used endpoint ${url}`);
+        return { message, raw: data } as any;
+      } catch (err) {
+        // If fetch itself failed (network), throw immediately
+        if ((err as any).message && !(err as any).message.includes('404')) {
+          throw err;
+        }
+        // otherwise continue to try next endpoint
+      }
+    }
+
+    throw new Error('Ollama HTTP: no valid endpoint responded (checked multiple fallbacks)');
+  }
+
+  // Fallback to the installed `ollama` SDK when no HTTP URL is set
+  return await ollama.chat({ model: opts.model, messages: opts.messages, tools: opts.tools });
+}
 
 // Validate required environment variables
 if (!process.env.DATABASE_URL) {
@@ -133,7 +207,7 @@ app.post('/api/chat', async (req: Request, res: Response<ApiResponse>) => {
     }
     
     // 3. Ollama Chat Execution
-    const response = await ollama.chat({
+    const response = await callOllamaChat({
       model: MODEL,
       messages: [
         {

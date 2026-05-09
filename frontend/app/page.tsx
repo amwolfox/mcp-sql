@@ -3,7 +3,14 @@
 import React, { useState, useEffect } from 'react';
 
 export default function ChatApp() {
-  const [messages, setMessages] = useState([]);
+  type Message = {
+    role: 'user' | 'assistant';
+    text: string;
+    sql?: string | null;
+    dbTable?: any[] | null;
+  };
+
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -26,7 +33,7 @@ export default function ChatApp() {
   const handleSend = async () => {
     if (!input) return;
     setLoading(true);
-    const newMsg = { role: 'user', text: input };
+    const newMsg: Message = { role: 'user', text: input };
     setMessages(prev => [...prev, newMsg]);
     // Clear the input immediately so the UI feels responsive
     setInput('');
@@ -39,12 +46,13 @@ export default function ChatApp() {
       });
       const data = await res.json();
 
-      setMessages(prev => [...prev, {
+      const assistantMsg: Message = {
         role: 'assistant',
         text: data.assistantText,
         sql: data.sql,
         dbTable: Array.isArray(data.data) ? data.data : null
-      }]);
+      };
+      setMessages(prev => [...prev, assistantMsg]);
     } catch (e) {
       console.error("Chat error", e);
     } finally {
